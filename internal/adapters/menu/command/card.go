@@ -2,6 +2,7 @@ package command
 
 import (
 	"github.com/erbalo/hexago/internal/app/card"
+	"github.com/erbalo/hexago/internal/app/domain"
 	pretty "github.com/inancgumus/prettyslice"
 )
 
@@ -18,4 +19,10 @@ func NewCardCommand(cardService card.Service) *CardCommand {
 func (options *CardCommand) GetAll() {
 	cards, _ := options.cardService.GetAll()
 	pretty.Show("cards", cards)
+}
+
+func (command *CardCommand) Create(request domain.CardCreateReq) {
+	card, _ := command.cardService.Create(request)
+	cards := []*domain.CardRepresentation{card}
+	pretty.Show("card", cards)
 }
