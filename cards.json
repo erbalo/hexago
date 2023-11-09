@@ -1,1 +1,1 @@
-[{"id":1,"network":2,"bin":123456,"last_digits":9876,"issuer":"BBVA"},{"id":2,"network":1,"bin":123456,"last_digits":9876,"issuer":"BBAVAHS"},{"id":3,"network":3,"bin":1241,"last_digits":241,"issuer":"HSBC"}]
+[{"id":1,"network":5,"bin":123456,"last_digits":987,"issuer":"Bitso"},{"id":2,"network":2,"bin":654321,"last_digits":7890,"issuer":"BBVA"}]

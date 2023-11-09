@@ -2,22 +2,11 @@ package menu
 
 import (
 	"fmt"
-	"strconv"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/erbalo/hexago/internal/adapters/menu/command"
+	"github.com/erbalo/hexago/internal/adapters/menu/input"
 	"github.com/erbalo/hexago/internal/app/card"
-	"github.com/erbalo/hexago/internal/app/domain"
-)
-
-type InputState int
-
-const (
-	Principal InputState = iota
-	PromptingBIN
-	PromptingLastDigits
-	PromptingNetwork
-	PromptingIssuer
 )
 
 type model struct {
@@ -25,7 +14,7 @@ type model struct {
 	cursor      int
 	selected    string
 	inputState  InputState
-	inputs      map[string]string // Use a map to store the input fields
+	inputs      map[string]string
 	cardCommand command.CardCommand
 }
 
@@ -44,149 +33,137 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
-func (model model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch message := msg.(type) {
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if model.inputState == Principal {
-			switch message.String() {
-			case "up", "k":
-				if model.cursor > 0 {
-					model.cursor--
-				}
-			case "down", "j":
-				if model.cursor < len(model.choices)-1 {
-					model.cursor++
-				}
-			case "enter", " ":
-				model.selected = model.choices[model.cursor]
-				// Handle the selected action
-				switch model.selected {
-				case "Get all cards":
-					model.cardCommand.GetAll()
-				case "Create a card":
-					// Transition to the input state and begin the input sequence
-					model.inputState = PromptingBIN
-					return model, model.nextPromptScreen()
-				}
-
-				return model, tea.Quit
-			case "q", "ctrl+c":
-				return model, tea.Quit
-			}
-		} else {
-			switch model.inputState {
-			case PromptingBIN:
-				if message.Type == tea.KeyRunes {
-					model.inputs["bin"] += string(message.Runes)
-				} else if message.Type == tea.KeyEnter {
-					// Advance to the next prompt
-					model.inputState = PromptingLastDigits
-					return model, model.nextPromptScreen()
-				} else if message.Type == tea.KeyBackspace || message.Type == tea.KeyDelete {
-					// Handle backspace/delete key
-					if len(model.inputs["bin"]) > 0 {
-						// Remove the last character from the input
-						model.inputs["bin"] = model.inputs["bin"][:len(model.inputs["bin"])-1]
-					}
-				}
-			case PromptingLastDigits:
-				if message.Type == tea.KeyRunes {
-					model.inputs["last_digits"] += string(message.Runes)
-				} else if message.Type == tea.KeyEnter {
-					// Advance to the next prompt
-					model.inputState = PromptingNetwork
-					return model, model.nextPromptScreen()
-				} else if message.Type == tea.KeyBackspace || message.Type == tea.KeyDelete {
-					// Handle backspace/delete key
-					if len(model.inputs["last_digits"]) > 0 {
-						// Remove the last character from the input
-						model.inputs["last_digits"] = model.inputs["last_digits"][:len(model.inputs["last_digits"])-1]
-					}
-				}
-			case PromptingNetwork:
-				if message.Type == tea.KeyRunes {
-					model.inputs["network"] += string(message.Runes)
-				} else if message.Type == tea.KeyEnter {
-					// Advance to the next prompt
-					model.inputState = PromptingIssuer
-					return model, model.nextPromptScreen()
-				} else if message.Type == tea.KeyBackspace || message.Type == tea.KeyDelete {
-					// Handle backspace/delete key
-					if len(model.inputs["network"]) > 0 {
-						// Remove the last character from the input
-						model.inputs["network"] = model.inputs["network"][:len(model.inputs["network"])-1]
-					}
-				}
-			case PromptingIssuer:
-				if message.Type == tea.KeyRunes {
-					model.inputs["issuer"] += string(message.Runes)
-				} else if message.Type == tea.KeyEnter {
-					// Advance to the next prompt
-					model.inputState = Principal
-
-					bin, _ := strconv.Atoi(model.inputs["bin"])
-					lastDigits, _ := strconv.Atoi(model.inputs["last_digits"])
-					network, _ := strconv.Atoi(model.inputs["network"])
-					issuer := model.inputs["issuer"]
-
-					cardReq := domain.CardCreateReq{
-						Bin:        bin,
-						LastDigits: lastDigits,
-						Network:    domain.CardNetwork(network),
-						Issuer:     issuer,
-					}
-
-					model.cardCommand.Create(cardReq)
-
-					return model, tea.Quit
-				} else if message.Type == tea.KeyBackspace || message.Type == tea.KeyDelete {
-					// Handle backspace/delete key
-					if len(model.inputs["issuer"]) > 0 {
-						// Remove the last character from the input
-						model.inputs["issuer"] = model.inputs["issuer"][:len(model.inputs["issuer"])-1]
-					}
-				}
-			}
-
-			if message.String() == "q" || message.String() == "ctrl+c" {
-				// Exit the program when 'q' or Ctrl+C is pressed
-				return model, tea.Quit
-			}
+		if m.inputState == Principal {
+			return m.updatePrincipal(msg)
 		}
-
+		return m.updateInput(msg)
 	}
 
-	return model, nil
+	return m, nil
+}
+
+func (m model) updatePrincipal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "up", "k":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "down", "j":
+		if m.cursor < len(m.choices)-1 {
+			m.cursor++
+		}
+	case "enter", " ":
+		m.selected = m.choices[m.cursor]
+		return m.handleSelection()
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	}
+
+	return m, nil
+}
+
+func (m model) handleSelection() (tea.Model, tea.Cmd) {
+	switch m.selected {
+	case "Get all cards":
+		m.cardCommand.GetAll()
+	case "Create a card":
+		m.inputState = PromptingBIN
+		return m, m.nextPromptScreen()
+	}
+
+	return m, tea.Quit
+}
+
+func (m model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "q" || msg.String() == "ctrl+c" {
+		return m, tea.Quit
+	}
+
+	var key string
+	switch m.inputState {
+	case PromptingBIN:
+		key = input.BinKey
+	case PromptingLastDigits:
+		key = input.LastDigitsKey
+	case PromptingNetwork:
+		key = input.NetworkKey
+	case PromptingIssuer:
+		key = input.IssuerKey
+	default:
+		return m, nil
+	}
+
+	if msg.Type == tea.KeyRunes {
+		m.inputs[key] += string(msg.Runes)
+	} else if msg.Type == tea.KeyEnter {
+		return m.advanceInputState()
+	} else if msg.Type == tea.KeyBackspace || msg.Type == tea.KeyDelete {
+		if len(m.inputs[key]) > 0 {
+			m.inputs[key] = m.inputs[key][:len(m.inputs[key])-1]
+		}
+	}
+
+	return m, nil
+}
+
+func (m *model) advanceInputState() (tea.Model, tea.Cmd) {
+	switch m.inputState {
+	case PromptingBIN:
+		m.inputState = PromptingLastDigits
+	case PromptingLastDigits:
+		m.inputState = PromptingNetwork
+	case PromptingNetwork:
+		m.inputState = PromptingIssuer
+	case PromptingIssuer:
+		m.inputState = Principal
+		return m.createCard()
+	}
+
+	return m, m.nextPromptScreen()
+}
+
+func (m model) createCard() (tea.Model, tea.Cmd) {
+	m.cardCommand.Create(m.inputs)
+	return m, tea.Quit
 }
 
 func (m model) nextPromptScreen() tea.Cmd {
 	return tea.EnterAltScreen
 }
 
-func (model model) View() string {
+func (m model) View() string {
+	switch m.inputState {
+	case Principal:
+		return m.viewPrincipal()
+	case PromptingBIN:
+		return m.viewInputPrompt("Enter BIN (int): ", input.BinKey)
+	case PromptingLastDigits:
+		return m.viewInputPrompt("Enter last digits (int): ", input.LastDigitsKey)
+	case PromptingNetwork:
+		return m.viewInputPrompt("Enter network (int): ", input.NetworkKey)
+	case PromptingIssuer:
+		return m.viewInputPrompt("Enter issuer (string): ", input.IssuerKey)
+	default:
+		return ""
+	}
+}
+
+func (m model) viewPrincipal() string {
 	var s string
-	for i, choice := range model.choices {
-		// Render the cursor
+	for i, choice := range m.choices {
 		cursor := " "
-		if model.cursor == i {
+		if m.cursor == i {
 			cursor = cursorStyle.Render(">")
 		}
-		// Render the choice
 		s += fmt.Sprintf("%s %s\n", cursor, choiceStyle.Render(choice))
 	}
-
 	s += continueStyle.Render("\nPress q to quit...\n\n")
-
-	switch model.inputState {
-	case PromptingBIN:
-		return "Enter BIN (int): " + model.inputs["bin"]
-	case PromptingLastDigits:
-		return "Enter last digits (int): " + model.inputs["last_digits"]
-	case PromptingNetwork:
-		return "Enter network (int): " + model.inputs["network"]
-	case PromptingIssuer:
-		return "Enter Issuer (int): " + model.inputs["issuer"]
-	}
-
 	return s
+}
+
+func (m model) viewInputPrompt(prompt string, key string) string {
+	return prompt + m.inputs[key]
 }
