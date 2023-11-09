@@ -24,7 +24,7 @@ func (options *CardCommand) GetAll() {
 	pretty.Show("cards", cards)
 }
 
-func (command *CardCommand) Create(inputs map[string]string) {
+func (command *CardCommand) Create(inputs map[string]string) (*domain.CardRepresentation, error) {
 	bin, _ := strconv.Atoi(inputs[input.BinKey])
 	lastDigits, _ := strconv.Atoi(inputs[input.LastDigitsKey])
 	network, _ := strconv.Atoi(inputs[input.NetworkKey])
@@ -37,7 +37,14 @@ func (command *CardCommand) Create(inputs map[string]string) {
 		Issuer:     issuer,
 	}
 
-	card, _ := command.cardService.Create(request)
-	cards := []*domain.CardRepresentation{card}
-	pretty.Show("card", cards)
+	return command.cardService.Create(request)
+}
+
+func (command *CardCommand) PrintCard(card domain.CardRepresentation) {
+	cards := []domain.CardRepresentation{card}
+	command.PrintCards(cards)
+}
+
+func (command *CardCommand) PrintCards(cards []domain.CardRepresentation) {
+	pretty.Show("cards", cards)
 }

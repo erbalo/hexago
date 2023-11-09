@@ -7,6 +7,7 @@ import (
 	"github.com/erbalo/hexago/internal/adapters/menu/command"
 	"github.com/erbalo/hexago/internal/adapters/menu/input"
 	"github.com/erbalo/hexago/internal/app/card"
+	"github.com/erbalo/hexago/internal/app/domain"
 )
 
 type model struct {
@@ -16,6 +17,7 @@ type model struct {
 	inputState  InputState
 	inputs      map[string]string
 	cardCommand command.CardCommand
+	createdCard domain.CardRepresentation
 }
 
 func InitialModel(cardService card.Service) model {
@@ -39,6 +41,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.inputState == Principal {
 			return m.updatePrincipal(msg)
 		}
+
+		if m.inputState == CreatedCard {
+			card := m.createdCard
+			m.cardCommand.PrintCard(card)
+			return m, tea.Quit
+		}
+
 		return m.updateInput(msg)
 	}
 
@@ -118,7 +127,7 @@ func (m *model) advanceInputState() (tea.Model, tea.Cmd) {
 	case PromptingNetwork:
 		m.inputState = PromptingIssuer
 	case PromptingIssuer:
-		m.inputState = Principal
+		m.inputState = CreatedCard
 		return m.createCard()
 	}
 
@@ -126,8 +135,10 @@ func (m *model) advanceInputState() (tea.Model, tea.Cmd) {
 }
 
 func (m model) createCard() (tea.Model, tea.Cmd) {
-	m.cardCommand.Create(m.inputs)
-	return m, tea.Quit
+	card, _ := m.cardCommand.Create(m.inputs)
+	m.createdCard = *card
+
+	return m, tea.ExitAltScreen
 }
 
 func (m model) nextPromptScreen() tea.Cmd {
@@ -135,20 +146,24 @@ func (m model) nextPromptScreen() tea.Cmd {
 }
 
 func (m model) View() string {
+	var s string
 	switch m.inputState {
 	case Principal:
-		return m.viewPrincipal()
+		s = m.viewPrincipal()
 	case PromptingBIN:
-		return m.viewInputPrompt("Enter BIN (int): ", input.BinKey)
+		s = m.viewInputPrompt("Enter BIN (int): ", input.BinKey)
 	case PromptingLastDigits:
-		return m.viewInputPrompt("Enter last digits (int): ", input.LastDigitsKey)
+		s = m.viewInputPrompt("Enter last digits (int): ", input.LastDigitsKey)
 	case PromptingNetwork:
-		return m.viewInputPrompt("Enter network (int): ", input.NetworkKey)
+		s = m.viewInputPrompt("Enter network (int): ", input.NetworkKey)
 	case PromptingIssuer:
-		return m.viewInputPrompt("Enter issuer (string): ", input.IssuerKey)
+		s = m.viewInputPrompt("Enter issuer (string): ", input.IssuerKey)
 	default:
-		return ""
+		s = ""
 	}
+
+	s += continueStyle.Render("\n\nPress q or Ctrl+c to quit...\n\n")
+	return s
 }
 
 func (m model) viewPrincipal() string {
@@ -160,7 +175,7 @@ func (m model) viewPrincipal() string {
 		}
 		s += fmt.Sprintf("%s %s\n", cursor, choiceStyle.Render(choice))
 	}
-	s += continueStyle.Render("\nPress q to quit...\n\n")
+
 	return s
 }
 

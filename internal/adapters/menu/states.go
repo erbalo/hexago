@@ -8,4 +8,5 @@ const (
 	PromptingLastDigits
 	PromptingNetwork
 	PromptingIssuer
+	CreatedCard
 )
