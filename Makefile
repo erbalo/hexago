@@ -1,7 +1,9 @@
 GO ?= go
+CLI_PARAM ?= http
 
-MAIN = cmd/main.go
-CLI_DIR = ./bin/hexago
+MAIN = cmd/${CLI_PARAM}/main.go
+BIN_DIR = ./bin
+CLI_DIR = ${BIN_DIR}/hexago
 EXEC = ${CLI_DIR}
 
 # Detect the operating system
@@ -35,13 +37,22 @@ dependencies:
 	$(GO) mod download
 	$(GO) mod tidy
 
-build-linux:
+param-selector:
+	@if [ -z "$(CLI_PARAM)" ]; then \
+		echo "No parameter provided, using default"; \
+		echo "Parameter is $(CLI_PARAM)"; \
+	else \
+		echo "Parameter provided"; \
+		echo "Parameter is $(CLI_PARAM)"; \
+	fi
+
+build-linux: param-selector
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=linux $(GO) build -o $(CLI_DIR)-linux -v $(MAIN)
 
-build-darwin:
+build-darwin: param-selector
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=darwin $(GO) build -o $(CLI_DIR)-darwin -v $(MAIN)
 
-build-windows:
+build-windows: param-selector
 	CGO_ENABLED=0 GOARCH=amd64 GOOS=windows $(GO) build -o $(CLI_DIR)-windows.exe -v $(MAIN)
 
 run: build-linux build-darwin build-windows
@@ -49,8 +60,6 @@ run: build-linux build-darwin build-windows
 
 clean:
 	go clean
-	rm $(CLI_DIR)-darwin
-	rm $(CLI_DIR)-linux
-	rm $(CLI_DIR)-windows.exe
+	rm -rf $(BIN_DIR)
 
 .PHONY: all dependencies run clean
